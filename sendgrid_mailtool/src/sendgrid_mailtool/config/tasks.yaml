@@ -1,0 +1,103 @@
+create_email_content:
+  description: >
+    Create a personalized HTML email for candidate {candidate_first_name} at {candidate_email}.
+    
+    The email must inform them about 1 matched job requirement.
+    
+    The email should include:
+    1. A warm, personalized greeting: "Hi {candidate_first_name},"
+    2. Opening paragraph explaining we found a matching job requirement for their profile
+    3. Job requirement details:
+       - Requirement Title (bold and prominent)
+       - Match Score (highlight this percentage)
+       - Detailed Description
+    4. Mention that our Auto_Apply Agent has already applied to this requirement on their behalf
+    5. Note that recruiters will contact them soon
+    6. Professional closing with encouraging message
+    
+    Matched Job Requirement:
+    {job_details}
+    
+    Format the email in clean HTML with proper structure:
+    - Use <h2> for main heading
+    - Use <h3> for the requirement title
+    - Use <p> tags for paragraphs
+    - Use <strong> for emphasis on match score
+    - Use proper spacing and readability
+    - Make it exciting and personal!
+    
+  expected_output: >
+    Complete HTML email content ready for SendGrid delivery. The HTML should be 
+    well-structured, mobile-responsive, and professionally formatted. Focus on 
+    making the candidate excited about THIS specific job match.
+  agent: email_content_creator
+
+send_email_task:
+  description: >
+    Send the email created by the email_content_creator to {candidate_email}.
+    
+    Use the SendGrid Email Sender tool with these parameters:
+    - to_email: {candidate_email}
+    - subject: "Great News! New Job Match Found for Your Profile 🎯"
+    - from_email: {from_email}
+    - html_content: [Use the HTML content created in the previous task]
+    
+    Ensure delivery is successful and return the status code.
+    
+  expected_output: >
+    Email delivery confirmation with SendGrid status code (202 for success),
+    timestamp, and recipient email address. Include any error messages if delivery fails.
+  agent: email_sender
+  context:
+    - create_email_content
+
+# NEW: SMS Content Task
+create_sms_content:
+  description: >
+    Create a concise SMS message for candidate {candidate_first_name} at {candidate_mobile}.
+    
+    IMPORTANT: SMS messages must be SHORT (max 160 characters for best delivery).
+    
+    The SMS should include:
+    1. Brief personalized greeting: "Hi {candidate_first_name}!"
+    2. Exciting news about job match
+    3. Job title: {job_title}
+    4. Match score: {match_score}%
+    5. Brief action: "Applied via Auto-Apply Agent"
+    6. Closing: "Recruiter will contact soon!"
+    
+    CRITICAL CONSTRAINTS:
+    - Maximum 160 characters total
+    - No emojis (may not display on all phones)
+    - Clear and professional tone
+    - Include the job title
+    - Mention it's automated
+    
+    Example format:
+    "Hi {candidate_first_name}! Great match: {job_title} ({match_score}% fit). Auto-applied for you. Recruiter will contact soon!"
+    
+  expected_output: >
+    A concise SMS message (max 160 chars) that is professional, exciting, and 
+    informative. The message should be plain text without emojis, ready for 
+    Twilio SMS delivery.
+  agent: sms_content_creator
+
+# NEW: SMS Send Task
+send_sms_task:
+  description: >
+    Send the SMS message created by the sms_content_creator to {candidate_mobile}.
+    
+    Use the Twilio SMS Sender tool with these parameters:
+    - to_phone: {candidate_mobile}
+    - message_body: [Use the SMS content created in the previous task]
+    - from_phone: [Use TWILIO_PHONE_NUMBER from environment]
+    
+    Ensure the phone number is in correct format with country code (e.g., +919876543210).
+    Ensure delivery is successful and return the message SID.
+    
+  expected_output: >
+    SMS delivery confirmation with Twilio message SID, status, timestamp, and 
+    recipient phone number. Include any error messages if delivery fails.
+  agent: sms_sender
+  context:
+    - create_sms_content

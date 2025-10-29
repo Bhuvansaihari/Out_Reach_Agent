@@ -1,0 +1,34 @@
+[project]
+name = "sendgrid_mailtool"
+version = "0.1.0"
+description = "SendGrid_mailtool using CrewAI"
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.10,<3.14"
+
+dependencies = [
+    "crewai[tools]>=0.203.1,<1.0.0",
+    "crewai>=0.70.0",
+    "crewai-tools>=0.12.0",
+    "sendgrid>=6.11.0",
+    "python-dotenv>=1.0.0",
+    "openai>=1.0.0",
+    "pydantic>=2.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "supabase>=2.7.0",
+    "twilio>=9.3.0"
+]
+
+[project.scripts]
+sendgrid_mailtool = "sendgrid_mailtool.main:run"
+run_crew = "sendgrid_mailtool.main:run"
+train = "sendgrid_mailtool.main:train"
+replay = "sendgrid_mailtool.main:replay"
+test = "sendgrid_mailtool.main:test"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.crewai]
+type = "crew"
