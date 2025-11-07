@@ -1,180 +1,136 @@
-#!/usr/bin/env python
-import sys
-import warnings
-from datetime import datetime
-from sendgrid_mailtool.crew import SendgridMailtool
-
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
-
-
-# Mock job data (will be replaced with real database data later)
-MOCK_JOBS = [
-    {
-        "title": "Senior Python Developer",
-        "company": "TechCorp Solutions",
-        "location": "Bangalore, India (Hybrid)",
-        "description": "Looking for an experienced Python developer with expertise in AI/ML, FastAPI, and microservices architecture."
-    },
-    {
-        "title": "Machine Learning Engineer",
-        "company": "AI Innovations Ltd",
-        "location": "Hyderabad, India (Remote)",
-        "description": "Seeking ML engineer to build RAG systems, work with vector databases, and develop LLM applications."
-    },
-    {
-        "title": "Full Stack AI Developer",
-        "company": "DataDrive Systems",
-        "location": "Mumbai, India (On-site)",
-        "description": "Full stack role focusing on AI integration, building Streamlit apps, and API development with Python."
-    },
-    {
-        "title": "AI/ML Software Engineer",
-        "company": "CloudTech Ventures",
-        "location": "Pune, India (Hybrid)",
-        "description": "Develop cutting-edge AI solutions using LangChain, vector databases, and modern ML frameworks."
-    }
-]
-
-
-def format_job_details(jobs):
-    """Format job details for the email content"""
-    formatted_jobs = ""
-    for idx, job in enumerate(jobs, 1):
-        formatted_jobs += f"""
-        Job {idx}:
-        - Title: {job['title']}
-        - Company: {job['company']}
-        - Location: {job['location']}
-        - Description: {job['description']}
-        
-        """
-    return formatted_jobs.strip()
-
-
-def run():
+async def process_notifications_for_application(cand_id: int, requirement_id: str):
     """
-    Run the crew to send job match email to a candidate.
-    Takes email input from terminal.
-    """
-    print("\n" + "="*60)
-    print("🤖 AUTO-APPLY AGENT - JOB MATCH EMAIL SENDER")
-    print("="*60 + "\n")
+    Process and send email AND SMS to candidate for ONE job application
     
-    # Get input from terminal
+    Args:
+        cand_id: The candidate's ID (from auto_apply_cand)
+        requirement_id: The requirement ID (from parsed_requirements)
+    """
     try:
-        candidate_email = input("Enter candidate email address: ").strip()
-        if not candidate_email or "@" not in candidate_email:
-            print("❌ Error: Invalid email address provided.")
+        print(f"\n{'='*70}")
+        print(f"🔍 PROCESSING APPLICATION NOTIFICATIONS (EMAIL + SMS)")
+        print(f"   Candidate ID: {cand_id}")
+        print(f"   Requirement ID: {requirement_id}")
+        print(f"{'='*70}\n")
+        
+        # Get application details with candidate and requirement info
+        app_data = get_application_details(cand_id, requirement_id)
+        
+        if not app_data:
+            print(f"⏸️  Application not found or both notifications already sent. Skipping.\n")
             return
         
-        candidate_first_name = input("Enter candidate first name: ").strip()
-        if not candidate_first_name:
-            print("❌ Error: First name cannot be empty.")
-            return
+        candidate = app_data['candidate']
+        requirement = app_data['requirement']
+        application_id = app_data['application_id']
+        email_sent = app_data['email_sent']
+        sms_sent = app_data['sms_sent']
         
-        print(f"\n📧 Preparing to send job matches to {candidate_first_name} ({candidate_email})...")
-        print(f"📊 Found {len(MOCK_JOBS)} matching jobs\n")
+        first_name = candidate['candidate_first_name']
         
-        # Prepare inputs for the crew
-        inputs = {
-            'candidate_email': candidate_email,
-            'candidate_first_name': candidate_first_name,
-            'job_count': len(MOCK_JOBS),
-            'job_details': format_job_details(MOCK_JOBS),
-            'from_email': 'bhuvannaidu2524@gmail.com',
-            'current_year': str(datetime.now().year)
+        # Get mobile number (try mobile first, then work, then home)
+        candidate_mobile = (
+            candidate.get('candidate_mobile') or 
+            candidate.get('candidate_work') or 
+            candidate.get('candidate_home') or 
+            ''
+        )
+        
+        # Format phone number if available
+        formatted_phone = ''
+        if candidate_mobile:
+            formatted_phone = format_phone_number(candidate_mobile)
+        
+        print(f"✅ Application Details:")
+        print(f"   - Candidate: {candidate['candidate_name']}")
+        print(f"   - Email: {candidate['candidate_email']}")
+        print(f"   - Mobile: {candidate_mobile or 'Not available'}")
+        print(f"   - Experience: {candidate['candidate_experience']} years")
+        print(f"   - Job: {requirement['requirement_title']}")
+        print(f"   - Client: {requirement['client_name']}")
+        print(f"   - Location: {requirement['location']}")
+        print(f"   - Match Score: {requirement['matching_score'] * 100:.1f}%")
+        print(f"   - Email Sent: {email_sent}")
+        print(f"   - SMS Sent: {sms_sent}")
+        print()
+        
+        # Prepare COMPLETE inputs for both email and SMS
+        complete_inputs = {
+            # Email-specific
+            'candidate_email': candidate['candidate_email'],
+            'candidate_first_name': first_name,
+            'job_count': 1,
+            'job_details': format_single_requirement(requirement),
+            'from_email': os.getenv('SENDGRID_FROM_EMAIL'),
+            'current_year': str(datetime.now().year),
+            
+            # SMS-specific
+            'candidate_mobile': formatted_phone or 'N/A',
+            'job_title': requirement['requirement_title'],
+            'match_score': f"{requirement['matching_score'] * 100:.0f}",
         }
         
-        print("🚀 Starting email creation and delivery process...\n")
-        print("-"*60)
+        # ===== SEND EMAIL (if not already sent) =====
+        if not email_sent:
+            print(f"{'='*70}")
+            print(f"📧 SENDING EMAIL NOTIFICATION")
+            print(f"{'='*70}\n")
+            
+            try:
+                # Use email_crew() instead of crew()
+                result = SendgridMailtool().email_crew().kickoff(inputs=complete_inputs)
+                print(f"\n✅ Email sent successfully!")
+                mark_email_sent(application_id)
+            except Exception as e:
+                print(f"❌ Error sending email: {str(e)}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"⏭️  Email already sent, skipping email notification\n")
         
-        # Execute the crew
-        result = SendgridMailtool().crew().kickoff(inputs=inputs)
+        # ===== SEND SMS (if not already sent and phone available) =====
+        if not sms_sent:
+            if not candidate_mobile:
+                print(f"⚠️  No mobile number available, skipping SMS\n")
+                mark_sms_sent(application_id)
+            elif not validate_phone_number(formatted_phone):
+                print(f"⚠️  Invalid phone number format: {candidate_mobile}, skipping SMS\n")
+                mark_sms_sent(application_id)
+            else:
+                print(f"\n{'='*70}")
+                print(f"📱 SENDING SMS NOTIFICATION")
+                print(f"{'='*70}\n")
+                
+                try:
+                    # Use sms_crew() instead of crew()
+                    result = SendgridMailtool().sms_crew().kickoff(inputs=complete_inputs)
+                    print(f"\n✅ SMS sent successfully!")
+                    mark_sms_sent(application_id)
+                except Exception as e:
+                    print(f"❌ Error sending SMS: {str(e)}")
+                    import traceback
+                    traceback.print_exc()
+        else:
+            print(f"⏭️  SMS already sent, skipping SMS notification\n")
         
-        print("\n" + "-"*60)
-        print("✅ Process completed successfully!")
-        print("="*60 + "\n")
+        print(f"\n{'='*70}")
+        print(f"✅ APPLICATION PROCESSING COMPLETED")
+        print(f"{'='*70}\n")
         
-        return result
+        return {
+            "success": True,
+            "cand_id": cand_id,
+            "requirement_id": requirement_id,
+            "application_id": application_id,
+            "email_sent": not email_sent,
+            "sms_sent": not sms_sent,
+            "candidate_email": candidate['candidate_email'],
+            "candidate_mobile": candidate_mobile
+        }
         
-    except KeyboardInterrupt:
-        print("\n\n⚠️ Process cancelled by user.")
-        sys.exit(0)
     except Exception as e:
-        print(f"\n❌ An error occurred while running the crew: {e}")
-        raise
-
-
-def train():
-    """
-    Train the crew for a given number of iterations.
-    Usage: python main.py train <n_iterations> <filename>
-    """
-    if len(sys.argv) < 3:
-        print("Usage: python main.py train <n_iterations> <filename>")
-        return
-    
-    inputs = {
-        'candidate_email': 'test@example.com',
-        'candidate_first_name': 'John',
-        'job_count': len(MOCK_JOBS),
-        'job_details': format_job_details(MOCK_JOBS),
-        'from_email': 'bhuvannaidu2524@gmail.com',
-        'current_year': str(datetime.now().year)
-    }
-    
-    try:
-        SendgridMailtool().crew().train(
-            n_iterations=int(sys.argv[1]), 
-            filename=sys.argv[2], 
-            inputs=inputs
-        )
-    except Exception as e:
-        raise Exception(f"An error occurred while training the crew: {e}")
-
-
-def replay():
-    """
-    Replay the crew execution from a specific task.
-    Usage: python main.py replay <task_id>
-    """
-    if len(sys.argv) < 2:
-        print("Usage: python main.py replay <task_id>")
-        return
-        
-    try:
-        SendgridMailtool().crew().replay(task_id=sys.argv[1])
-    except Exception as e:
-        raise Exception(f"An error occurred while replaying the crew: {e}")
-
-
-def test():
-    """
-    Test the crew execution and returns the results.
-    Usage: python main.py test <n_iterations> <eval_llm>
-    """
-    if len(sys.argv) < 3:
-        print("Usage: python main.py test <n_iterations> <eval_llm>")
-        return
-    
-    inputs = {
-        'candidate_email': 'test@example.com',
-        'candidate_first_name': 'Jane',
-        'job_count': len(MOCK_JOBS),
-        'job_details': format_job_details(MOCK_JOBS),
-        'from_email': 'bhuvannaidu2524@gmail.com',
-        'current_year': str(datetime.now().year)
-    }
-    
-    try:
-        SendgridMailtool().crew().test(
-            n_iterations=int(sys.argv[1]), 
-            eval_llm=sys.argv[2], 
-            inputs=inputs
-        )
-    except Exception as e:
-        raise Exception(f"An error occurred while testing the crew: {e}")
-
-
-if __name__ == "__main__":
-    run()
+        error_msg = f"❌ Error processing application: {str(e)}"
+        print(f"\n{error_msg}\n")
+        import traceback
+        traceback.print_exc()
+        raise Exception(error_msg)

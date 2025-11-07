@@ -33,7 +33,7 @@ class SendgridMailtool():
             allow_delegation=False
         )
 
-    # ===== SMS AGENTS (NEW) =====
+    # ===== SMS AGENTS =====
     @agent
     def sms_content_creator(self) -> Agent:
         """Agent responsible for creating concise SMS content"""
@@ -68,7 +68,7 @@ class SendgridMailtool():
             config=self.tasks_config['send_email_task'],
         )
 
-    # ===== SMS TASKS (NEW) =====
+    # ===== SMS TASKS =====
     @task
     def create_sms_content(self) -> Task:
         """Task to create concise SMS content"""
@@ -83,9 +83,31 @@ class SendgridMailtool():
             config=self.tasks_config['send_sms_task'],
         )
 
+    # ===== SEPARATE CREWS =====
+    
+    @crew
+    def email_crew(self) -> Crew:
+        """Creates crew for EMAIL ONLY"""
+        return Crew(
+            agents=[self.email_content_creator(), self.email_sender()],
+            tasks=[self.create_email_content(), self.send_email_task()],
+            process=Process.sequential,
+            verbose=True,
+        )
+
+    @crew
+    def sms_crew(self) -> Crew:
+        """Creates crew for SMS ONLY"""
+        return Crew(
+            agents=[self.sms_content_creator(), self.sms_sender()],
+            tasks=[self.create_sms_content(), self.send_sms_task()],
+            process=Process.sequential,
+            verbose=True,
+        )
+
     @crew
     def crew(self) -> Crew:
-        """Creates the SendgridMailtool crew with both email and SMS capabilities"""
+        """Creates the full crew with both email and SMS (for backward compatibility)"""
         return Crew(
             agents=self.agents,
             tasks=self.tasks,
