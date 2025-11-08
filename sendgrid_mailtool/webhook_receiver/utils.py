@@ -1,6 +1,7 @@
 """
 Utility functions for webhook receiver
 Updated for production schema: November 2025 version
+Changes: min_payrate/max_payrate, requirement_duration as TEXT
 """
 from typing import Dict
 import re
@@ -22,22 +23,35 @@ def format_single_requirement(requirement: Dict) -> str:
     if len(description) > 300:
         description = description[:300] + '...'
     
-    # NEW: Using similarity_score instead of matching_score
+    # Using similarity_score
     similarity_score = requirement.get('similarity_score', 0.0)
     match_percentage = f"{similarity_score * 100:.1f}%" if similarity_score else "N/A"
     
-    # NEW: Single payrate field instead of min/max
-    payrate = requirement.get('payrate')
-    if payrate and payrate > 0:
-        pay_rate_str = f"${payrate:.2f}/hr"
+    # NEW: Build pay rate from min/max
+    min_pay = requirement.get('min_payrate')
+    max_pay = requirement.get('max_payrate')
+    
+    if min_pay and max_pay:
+        if min_pay == max_pay:
+            pay_rate_str = f"${float(min_pay):.2f}/hr"
+        else:
+            pay_rate_str = f"${float(min_pay):.2f} - ${float(max_pay):.2f}/hr"
+    elif min_pay:
+        pay_rate_str = f"${float(min_pay):.2f}+/hr"
+    elif max_pay:
+        pay_rate_str = f"Up to ${float(max_pay):.2f}/hr"
     else:
         pay_rate_str = "Negotiable"
     
-    # NEW: Duration field
+    # Duration field (now TEXT - can be "3 months", "6-12 months", etc.)
     duration = requirement.get('requirement_duration')
-    duration_str = f"{duration} months" if duration else "Not specified"
+    if duration:
+        # If it's already a formatted string, use as-is
+        duration_str = str(duration).strip()
+    else:
+        duration_str = "Not specified"
     
-    # NEW: Open date
+    # Open date
     open_date = requirement.get('requirement_open_date')
     open_date_str = str(open_date) if open_date else "ASAP"
     

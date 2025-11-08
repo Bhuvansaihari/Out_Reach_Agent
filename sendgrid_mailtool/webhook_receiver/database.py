@@ -1,7 +1,7 @@
 """
 Database connection and helper functions for webhook receiver
 Updated for production schema: auto_apply_cand, parsed_requirements, job_application_tracking
-Schema version: November 2025 (with similarity_score, matching_id, is_remote_location)
+Schema version: November 2025 (min_payrate/max_payrate, duration as TEXT)
 """
 from supabase import create_client, Client
 import os
@@ -70,14 +70,15 @@ def get_application_details(cand_id: int, requirement_id: str) -> Optional[Dict]
         # Extract requirement details (UPDATED for new schema)
         requirement_info = {
             'requirement_id': app['requirement_id'],
-            'requirement_title': app['requirement_title'],  # from client_job_title
-            'requirement_description': app.get('requirement_description', ''),  # from requirement_job_description
+            'requirement_title': app['requirement_title'],
+            'requirement_description': app.get('requirement_description', ''),
             'client_name': app.get('client_name', 'N/A'),
-            'requirement_location': app.get('requirement_location', ''),  # from address
-            'requirement_zipcode': app.get('requirement_zipcode', ''),  # from req_zipcode
+            'requirement_location': app.get('requirement_location', ''),
+            'requirement_zipcode': app.get('requirement_zipcode', ''),
             'is_remote_location': app.get('is_remote_location', False),
-            'payrate': app.get('payrate'),  # single payrate field now
-            'requirement_duration': app.get('requirement_duration'),
+            'min_payrate': app.get('min_payrate'),        # NEW: min pay rate
+            'max_payrate': app.get('max_payrate'),        # NEW: max pay rate
+            'requirement_duration': app.get('requirement_duration'),  # TEXT field now
             'requirement_open_date': app.get('requirement_open_date'),
             'matching_id': app.get('matching_id'),
             'similarity_score': float(app['similarity_score']) if app.get('similarity_score') else 0.0
